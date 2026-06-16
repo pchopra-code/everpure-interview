@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Post-Acquisition Learnings Interview</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f4f6f9;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Top bar ── */
+  .topbar {
+    background: #1A1A1A;
+    color: #fff;
+    padding: 14px 24px;
+    flex-shrink: 0;
+  }
+  .topbar-logo {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 4px;
+  }
+  .topbar p { font-size: 0.76rem; opacity: 0.55; margin-top: 1px; letter-spacing: 0.01em; }
+
+  .progress-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .progress-track {
+    flex: 1;
+    background: rgba(255,255,255,0.15);
+    border-radius: 99px;
+    height: 4px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: #F97316;
+    border-radius: 99px;
+    transition: width 0.5s ease;
+    width: 0%;
+  }
+  .progress-label { font-size: 0.71rem; opacity: 0.7; white-space: nowrap; }
+
+  /* ── Screens ── */
+  #role-screen, #chat-screen, #done-screen {
+    flex: 1;
+    overflow-y: auto;
+    display: none;
+  }
+  #role-screen.active, #chat-screen.active, #done-screen.active {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Role selection ── */
+  .role-inner {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 28px 24px;
+    width: 100%;
+  }
+  .safety-note {
+    background: #FFF7ED;
+    border-left: 4px solid #F97316;
+    padding: 14px 18px;
+    border-radius: 0 8px 8px 0;
+    font-size: 0.84rem;
+    color: #2c3e50;
+    line-height: 1.6;
+    margin-bottom: 24px;
+  }
+  .safety-note strong { display: block; color: #1A1A1A; margin-bottom: 4px; }
+
+  .section-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #7a8a9a;
+    margin-bottom: 10px;
+  }
+  .role-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .role-btn {
+    border: 2px solid #dde3ec;
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px 16px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+  }
+  .role-btn:hover { border-color: #F97316; background: #FFF7ED; }
+  .role-btn.selected { border-color: #F97316; background: #FFF7ED; }
+  .role-icon { font-size: 1.3rem; margin-bottom: 5px; }
+  .role-name { font-size: 0.88rem; font-weight: 600; color: #1A1A1A; }
+  .role-desc { font-size: 0.75rem; color: #7a8a9a; margin-top: 2px; }
+
+  .start-btn {
+    width: 100%;
+    padding: 13px;
+    background: #F97316;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .start-btn:hover { background: #EA6A00; }
+  .start-btn:disabled { background: #F9C89A; cursor: not-allowed; }
+
+  /* ── Chat UI ── */
+  #chat-log {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-width: 700px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .bubble {
+    max-width: 82%;
+    padding: 12px 16px;
+    border-radius: 14px;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    animation: fadeUp 0.25s ease;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Interviewer (left) */
+  .bubble.bot {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-bottom-left-radius: 4px;
+    align-self: flex-start;
+    color: #1A1A1A;
+  }
+  .bubble.bot .badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #F97316;
+    margin-bottom: 5px;
+  }
+  .bubble.bot .hint {
+    font-size: 0.78rem;
+    color: #7a8a9a;
+    font-style: italic;
+    margin-top: 6px;
+  }
+
+  /* Typing indicator */
+  .bubble.typing {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-bottom-left-radius: 4px;
+    align-self: flex-start;
+    padding: 14px 18px;
+  }
+  .typing-dots { display: flex; gap: 5px; align-items: center; }
+  .typing-dots span {
+    width: 7px; height: 7px;
+    background: #F97316;
+    opacity: 0.6;
+    border-radius: 50%;
+    animation: bounce 1.1s infinite ease-in-out;
+  }
+  .typing-dots span:nth-child(2) { animation-delay: 0.18s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.36s; }
+  @keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30%           { transform: translateY(-5px); }
+  }
+
+  /* User (right) */
+  .bubble.user {
+    background: #F97316;
+    color: #fff;
+    border-bottom-right-radius: 4px;
+    align-self: flex-end;
+  }
+  .bubble.user.skipped {
+    background: #94a3b8;
+    font-style: italic;
+  }
+
+  /* ── Input bar ── */
+  #input-bar {
+    flex-shrink: 0;
+    background: #fff;
+    border-top: 1px solid #e2e8f0;
+    padding: 14px 16px;
+  }
+  .input-inner {
+    max-width: 700px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  #answer-box {
+    width: 100%;
+    border: 1.5px solid #dde3ec;
+    border-radius: 10px;
+    padding: 11px 14px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    resize: none;
+    min-height: 80px;
+    max-height: 180px;
+    color: #2c3e50;
+    transition: border-color 0.15s;
+    background: #fff;
+    overflow-y: auto;
+  }
+  #answer-box:focus { outline: none; border-color: #F97316; box-shadow: 0 0 0 3px rgba(249,115,22,0.12); }
+  #answer-box:disabled { background: #f8fafc; color: #b0bec5; }
+
+  .input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .send-btn {
+    padding: 9px 20px;
+    background: #F97316;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  .send-btn:hover { background: #EA6A00; }
+  .send-btn:disabled { background: #F9C89A; cursor: not-allowed; }
+
+  .skip-btn {
+    background: none;
+    border: 1px solid #dde3ec;
+    color: #7a8a9a;
+    padding: 9px 14px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  .skip-btn:hover { border-color: #94a3b8; color: #4a5568; }
+  .skip-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .char-hint { font-size: 0.72rem; color: #b0bec5; margin-left: auto; }
+
+  /* ── Done screen ── */
+  .done-inner {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    text-align: center;
+    width: 100%;
+  }
+  .check-circle {
+    width: 64px; height: 64px;
+    background: #FFF7ED;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 20px;
+    font-size: 2rem;
+  }
+  .done-inner h2 { font-size: 1.3rem; color: #1A1A1A; margin-bottom: 10px; }
+  .done-inner p  { color: #7a8a9a; font-size: 0.88rem; line-height: 1.6; margin-bottom: 24px; }
+
+  .dl-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #1A1A1A;
+    color: #fff;
+    padding: 13px 28px;
+    border-radius: 8px;
+    border: none;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+    margin-bottom: 14px;
+  }
+  .dl-btn:hover { background: #333; }
+
+  .restart-link {
+    display: block;
+    margin-top: 14px;
+    color: #F97316;
+    font-size: 0.84rem;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  @media (max-width: 480px) {
+    .role-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="topbar-logo">
+    <img src="data:image/png;base64,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"
+         width="36" height="36" style="flex-shrink:0" alt="Everpure"/>
+    <span style="font-size:1.25rem;font-weight:800;color:#fff;letter-spacing:-0.01em;margin-left:10px;line-height:1">Everpure<sup style="font-size:0.5em;font-weight:400;opacity:0.6;margin-left:1px">™</sup></span>
+  </div>
+  <p id="topbar-sub">Post-Acquisition Learnings · Confidential</p>
+  <div class="progress-wrap" id="progress-wrap" style="display:none">
+    <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="progress-label" id="progress-label">Q 0 / 0</div>
+  </div>
+</div>
+
+<!-- Role selection -->
+<div id="role-screen" class="active">
+  <div class="role-inner">
+    <div class="safety-note">
+      <strong>🔒 Before we begin</strong>
+      This interview is intended as a learning exercise. The goal is to understand what worked well and what could be improved, so we can strengthen our acquisition playbook for future transactions. It is not intended to assign blame or evaluate individual performance.
+    </div>
+
+    <p class="section-label">Select your role</p>
+    <div class="role-grid">
+      <button class="role-btn" onclick="selectRole('exec')" id="r-exec">
+        <div class="role-icon">👔</div>
+        <div class="role-name">Executive / Leadership</div>
+        <div class="role-desc">C-suite, VP, deal decision-maker</div>
+      </button>
+      <button class="role-btn" onclick="selectRole('pmo')" id="r-pmo">
+        <div class="role-icon">🗂️</div>
+        <div class="role-name">Corporate Development Team</div>
+        <div class="role-desc">Corp dev, deal lead, M&A team member</div>
+      </button>
+      <button class="role-btn" onclick="selectRole('functional')" id="r-functional">
+        <div class="role-icon">⚙️</div>
+        <div class="role-name">Functional Lead</div>
+        <div class="role-desc">Finance, HR, Legal, IT, Sales, etc.</div>
+      </button>
+      <button class="role-btn" onclick="selectRole('acquired')" id="r-acquired">
+        <div class="role-icon">🤝</div>
+        <div class="role-name">Acquired Company Employee</div>
+        <div class="role-desc">Joined through the acquisition</div>
+      </button>
+    </div>
+
+    <button class="start-btn" id="start-btn" disabled onclick="startInterview()">Start Interview →</button>
+  </div>
+</div>
+
+<!-- Chat interface -->
+<div id="chat-screen">
+  <div id="chat-log"></div>
+  <div id="input-bar">
+    <div class="input-inner">
+      <textarea id="answer-box" placeholder="Type your response here…" rows="3"
+        onkeydown="handleKey(event)" oninput="updateChar()"></textarea>
+      <div class="input-row">
+        <button class="skip-btn" id="skip-btn" onclick="submitAnswer(true)">Skip</button>
+        <span class="char-hint" id="char-hint"></span>
+        <button class="send-btn" id="send-btn" onclick="submitAnswer(false)">Send →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Done -->
+<iframe name="formspree-iframe" style="display:none"></iframe>
+<form id="formspree-form" action="https://formspree.io/f/xjgdokpv" method="POST" target="formspree-iframe" style="display:none">
+  <input type="hidden" name="role" id="f-role">
+  <input type="hidden" name="date" id="f-date">
+  <input type="hidden" name="transcript" id="f-transcript">
+</form>
+
+<div id="done-screen">
+  <div class="done-inner">
+    <div class="check-circle">✅</div>
+    <h2>Interview Complete — Thank You!</h2>
+    <p id="submit-msg">Your interview is complete — please click below to submit your responses. They will not be captured until you submit.</p>
+    <button class="dl-btn" id="submit-btn" onclick="submitToFormspree()" style="background:#F97316;">Submit Responses</button>
+    <p id="submit-success" style="display:none;margin-top:1rem;padding:0.75rem 1rem;background:#FFF7ED;border:1px solid #F97316;border-radius:8px;color:#92400e;font-size:0.85rem;">✅ Your responses have been submitted. Thank you!</p>
+    <span class="restart-link" onclick="restart()">Start a new interview (different role)</span>
+  </div>
+</div>
+
+<script>
+// ─── Question bank ────────────────────────────────────────────────────────────
+
+const ROLE_LABELS = {
+  exec:       'Executive / Leadership',
+  pmo:        'Corporate Development Team',
+  functional: 'Functional Lead',
+  acquired:   'Acquired Company Employee'
+};
+
+const SHARED_OPEN = [
+  { q: "How would you describe the overall acquisition experience from your vantage point?",
+    hint: "Feel free to speak candidly — highs, lows, or anything in between." },
+  { q: "What is the one thing you wish had been done differently?",
+    hint: "This could be about process, communication, timing, or resources." }
+];
+
+const SHARED_CLOSE = [
+  { q: "What worked really well that we should make sure to repeat in future acquisitions?",
+    hint: "Specific examples are especially valuable." },
+  { q: "Is there anything else you'd like to share that wasn't covered?",
+    hint: "Open floor — any observation, suggestion, or concern is welcome." }
+];
+
+const QUESTION_BANK = {
+  exec: [
+    ...SHARED_OPEN,
+    { q: "How well did the reality of this acquisition match the original strategic thesis?",
+      hint: "Consider product fit, talent, market position, or financial assumptions." },
+    { q: "How effective was pre-close due diligence in surfacing the risks that actually materialized?",
+      hint: "Were there blind spots? What would you have examined more closely?" },
+    { q: "How well-aligned were leadership teams from both sides during integration?",
+      hint: "Think about vision, priorities, communication cadence, and decision-making." },
+    { q: "Were integration resources — budget, headcount, executive sponsorship — sufficient?",
+      hint: "Where were the biggest constraints?" },
+    { q: "How would you assess cultural integration? What tensions emerged and how were they handled?",
+      hint: "Culture is often the hardest part — please be direct." },
+    ...SHARED_CLOSE
+  ],
+  pmo: [
+    ...SHARED_OPEN,
+    { q: "How well-defined was the integration plan going into Day 1? What was missing?",
+      hint: "Think about workstreams, owners, milestones, and dependencies." },
+    { q: "Where did the integration timeline slip, and what caused those delays?",
+      hint: "Was it resourcing, decision speed, technical complexity, or something else?" },
+    { q: "How effective were governance structures — steering committee, workstream leads, escalation paths?",
+      hint: "What broke down and what held up well?" },
+    { q: "How well did the two organizations share information during integration?",
+      hint: "Data access, tool handoffs, documentation quality, and trust." },
+    { q: "What integration tools or templates were missing that would have helped?",
+      hint: "Checklists, tracking systems, playbooks, communication templates, etc." },
+    { q: "How were integration team members supported in terms of workload and role clarity?",
+      hint: "Integration work often falls on top of existing jobs — was this addressed?" },
+    ...SHARED_CLOSE
+  ],
+  functional: [
+    ...SHARED_OPEN,
+    { q: "When were you brought into the process, and was that early enough?",
+      hint: "Early functional involvement often prevents costly rework later." },
+    { q: "What were the biggest integration challenges specific to your function?",
+      hint: "Systems, processes, policies, team structures, vendor contracts, compliance — whatever applies." },
+    { q: "How clearly did you understand what was expected of your function during integration?",
+      hint: "Were priorities and timelines communicated clearly to you?" },
+    { q: "Were there moments where conflicting priorities between functions created friction?",
+      hint: "How were those resolved — or not?" },
+    { q: "What data or information from the acquired company was hardest to access?",
+      hint: "This helps us improve data room and disclosure practices for future deals." },
+    { q: "What would your function do differently if you had to run this integration again?",
+      hint: "Think about sequencing, resourcing, tooling, or coordination." },
+    ...SHARED_CLOSE
+  ],
+  acquired: [
+    ...SHARED_OPEN,
+    { q: "How would you describe the communication you received before and after the acquisition closed?",
+      hint: "Were you informed, surprised, left in the dark, or overwhelmed?" },
+    { q: "How supported did you feel during the transition period?",
+      hint: "Think about onboarding, manager availability, access to tools, and clarity on your role." },
+    { q: "Were there elements of your previous company's culture or ways of working that you wish had been preserved?",
+      hint: "This is important feedback — there's no wrong answer." },
+    { q: "Were there moments where you felt your input or expertise wasn't being utilized or heard?",
+      hint: "This helps us understand integration dynamics from your perspective." },
+    { q: "What did the acquiring company do well in how it treated and integrated your team?",
+      hint: "Positive examples help us know what to replicate." },
+    { q: "If a colleague from your former company was anxious about an acquisition, what advice would you give them based on your experience?",
+      hint: "This is also useful for how we communicate to future acquired employees." },
+    ...SHARED_CLOSE
+  ]
+};
+
+// ─── Follow-up bank (fallback when AI is unavailable) ─────────────────────────
+
+const FOLLOW_UP_BANK = {
+  "How would you describe the overall acquisition experience from your vantage point?": [
+    "What were the biggest gaps between what you expected and what actually happened?",
+    "If you had to identify the single moment where things went off track, what was it?"
+  ],
+  "What is the one thing you wish had been done differently?": [
+    "What would that change have made possible that didn't happen?",
+    "Who was best positioned to drive that change, and what got in the way?"
+  ],
+  "How well did the reality of this acquisition match the original strategic thesis?": [
+    "Which specific assumptions have held up, and which have you already had to revise?",
+    "What would need to be true for you to feel confident the thesis is fully intact?"
+  ],
+  "How effective was pre-close due diligence in surfacing the risks that actually materialized?": [
+    "Which risks surprised you most after close — were there early signals that got missed?",
+    "What area would you examine much more closely in a future deal?"
+  ],
+  "How well-aligned were leadership teams from both sides during integration?": [
+    "Were there specific decisions where misalignment caused real problems? What happened?",
+    "What made alignment difficult — communication style, competing priorities, or something else?"
+  ],
+  "Were integration resources — budget, headcount, executive sponsorship — sufficient?": [
+    "Where were the biggest gaps — budget, people, or executive attention?",
+    "If you had one additional resource to deploy, where would it have gone?"
+  ],
+  "How would you assess cultural integration? What tensions emerged and how were they handled?": [
+    "What were the clearest signs of cultural friction you saw firsthand?",
+    "Were there specific moments that either helped or hurt cultural integration significantly?"
+  ],
+  "How well-defined was the integration plan going into Day 1? What was missing?": [
+    "What was the most critical workstream that lacked clear ownership or a plan?",
+    "How did those gaps manifest in practice — what broke down first?"
+  ],
+  "Where did the integration timeline slip, and what caused those delays?": [
+    "Were those delays foreseeable, or did they catch you off guard?",
+    "What would have needed to be in place to prevent those slips?"
+  ],
+  "How effective were governance structures — steering committee, workstream leads, escalation paths?": [
+    "Where did decisions get stuck, and how did that affect the integration?",
+    "What governance structure would you put in place differently next time?"
+  ],
+  "How well did the two organizations share information during integration?": [
+    "Where were the biggest gaps — systems access, documentation, or trust?",
+    "What did that breakdown in information sharing cost you in practice?"
+  ],
+  "What integration tools or templates were missing that would have helped?": [
+    "What was the most painful thing you had to build from scratch or do manually?",
+    "If you were building an integration playbook, what would be the first thing in it?"
+  ],
+  "How were integration team members supported in terms of workload and role clarity?": [
+    "Were people clear on whether integration was their primary job or secondary to their existing role?",
+    "What support would have made the biggest difference for the team?"
+  ],
+  "When were you brought into the process, and was that early enough?": [
+    "What decisions had already been made by the time you were brought in that caused problems?",
+    "What would have changed if you'd been involved earlier?"
+  ],
+  "What were the biggest integration challenges specific to your function?": [
+    "Which of those challenges could have been anticipated before close?",
+    "What was the downstream impact on the business?"
+  ],
+  "How clearly did you understand what was expected of your function during integration?": [
+    "Where was the ambiguity most painful — timelines, priorities, or decision authority?",
+    "How did you navigate that lack of clarity, and what did it cost you?"
+  ],
+  "Were there moments where conflicting priorities between functions created friction?": [
+    "How were those conflicts resolved — was there a clear escalation path?",
+    "What would better cross-functional coordination have looked like?"
+  ],
+  "What data or information from the acquired company was hardest to access?": [
+    "What impact did that have on your ability to do your job during integration?",
+    "What should be organized in the data room for future deals to prevent this?"
+  ],
+  "What would your function do differently if you had to run this integration again?": [
+    "What is the single change with the highest leverage that you'd make?",
+    "What would you tell your counterpart on the acquired side to prepare for?"
+  ],
+  "How would you describe the communication you received before and after the acquisition closed?": [
+    "What were you most anxious about that no one addressed directly?",
+    "What communication would have made the biggest difference to you and your colleagues?"
+  ],
+  "How supported did you feel during the transition period?": [
+    "What was the moment you felt most uncertain or unsupported — what was happening then?",
+    "What would meaningful support have looked like for you?"
+  ],
+  "Were there elements of your previous company's culture or ways of working that you wish had been preserved?": [
+    "Can you give me a specific example of something that was lost that mattered to you?",
+    "Did you feel there was an opportunity to advocate for those things, or did it feel futile?"
+  ],
+  "Were there moments where you felt your input or expertise wasn't being utilized or heard?": [
+    "Can you give me a specific example of when that happened?",
+    "What would have needed to be different for your expertise to be better utilized?"
+  ],
+  "What did the acquiring company do well in how it treated and integrated your team?": [
+    "What made that effective — was it specific people, processes, or decisions?",
+    "Do you think that happened intentionally, or did it work out despite the circumstances?"
+  ],
+  "If a colleague from your former company was anxious about an acquisition, what advice would you give them based on your experience?": [
+    "What do you know now that you wish you'd known going in?",
+    "What was the biggest misconception you had about what the acquisition would mean for you?"
+  ],
+  "What worked really well that we should make sure to repeat in future acquisitions?": [
+    "What made that work — was it specific people, timing, or a particular process?",
+    "Is that something that happened by design, or did it work out despite the circumstances?"
+  ],
+  "Is there anything else you'd like to share that wasn't covered?": [
+    "Is there something you held back on earlier that you'd want us to know?",
+    "If you were writing the playbook for the next acquisition, what's the first thing you'd add?"
+  ]
+};
+
+// ─── State ────────────────────────────────────────────────────────────────────
+
+let role = null;
+const MAX_FOLLOW_UPS = 2;
+let followUpCount = 0;
+let questions = [];
+let mainIdx = 0;
+let currentMainQ = null;
+let currentMainA = null;
+let waiting = false;
+let transcript = [];
+
+// ─── UI helpers ───────────────────────────────────────────────────────────────
+
+function show(id) {
+  ['role-screen','chat-screen','done-screen'].forEach(s => {
+    document.getElementById(s).classList.remove('active');
+  });
+  document.getElementById(id).classList.add('active');
+}
+
+function selectRole(r) {
+  role = r;
+  document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('r-' + r).classList.add('selected');
+  document.getElementById('start-btn').disabled = false;
+}
+
+function startInterview() {
+  questions = QUESTION_BANK[role];
+  mainIdx = 0;
+  transcript = [];
+
+  document.getElementById('topbar-sub').textContent = ROLE_LABELS[role] + ' · Post-Acquisition Learnings';
+  document.getElementById('progress-wrap').style.display = 'flex';
+
+  show('chat-screen');
+  document.getElementById('chat-log').innerHTML = '';
+  askMainQuestion();
+}
+
+function updateProgress() {
+  const pct = Math.round((mainIdx / questions.length) * 100);
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = `Q ${mainIdx} / ${questions.length}`;
+}
+
+function addBubble(type, content, badge, hint) {
+  const log = document.getElementById('chat-log');
+  const div = document.createElement('div');
+  div.className = 'bubble ' + type;
+
+  if (type === 'bot') {
+    if (badge) {
+      const b = document.createElement('div');
+      b.className = 'badge';
+      b.textContent = badge;
+      div.appendChild(b);
+    }
+    const p = document.createElement('p');
+    p.textContent = content;
+    div.appendChild(p);
+    if (hint) {
+      const h = document.createElement('div');
+      h.className = 'hint';
+      h.textContent = hint;
+      div.appendChild(h);
+    }
+  } else if (type === 'typing') {
+    div.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
+  } else {
+    div.textContent = content;
+    if (content === '[Skipped]') div.classList.add('skipped');
+  }
+
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  return div;
+}
+
+function removeTyping() {
+  const t = document.querySelector('.bubble.typing');
+  if (t) t.remove();
+}
+
+function setInputDisabled(disabled) {
+  document.getElementById('answer-box').disabled = disabled;
+  document.getElementById('send-btn').disabled = disabled;
+  document.getElementById('skip-btn').disabled = disabled;
+  if (!disabled) {
+    document.getElementById('answer-box').value = '';
+    document.getElementById('char-hint').textContent = '';
+    document.getElementById('answer-box').focus();
+  }
+}
+
+function updateChar() {
+  const len = document.getElementById('answer-box').value.length;
+  document.getElementById('char-hint').textContent = len > 0 ? len + ' chars' : '';
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    submitAnswer(false);
+  }
+}
+
+// ─── Interview flow ───────────────────────────────────────────────────────────
+
+function askMainQuestion() {
+  if (mainIdx >= questions.length) {
+    finishInterview();
+    return;
+  }
+  updateProgress();
+  followUpCount = 0;
+  currentMainQ = questions[mainIdx];
+  currentMainA = null;
+
+  transcript.push({ mainQ: currentMainQ.q, mainA: null, followUps: [] });
+
+  const badge = `Question ${mainIdx + 1} of ${questions.length}`;
+  addBubble('bot', currentMainQ.q, badge, currentMainQ.hint);
+  setInputDisabled(false);
+}
+
+function advanceQuestion() {
+  followUpCount = 0;
+  mainIdx++;
+  waiting = false;
+  askMainQuestion();
+}
+
+async function submitAnswer(skip) {
+  if (waiting) return;
+
+  const rawAnswer = document.getElementById('answer-box').value.trim();
+  const answer = skip ? '[Skipped]' : (rawAnswer || null);
+  if (!answer && !skip) return;
+
+  addBubble('user', answer || '[Skipped]');
+  setInputDisabled(true);
+  waiting = true;
+
+  const entry = transcript[transcript.length - 1];
+
+  if (followUpCount === 0) {
+    entry.mainA = answer;
+  } else {
+    entry.followUps[followUpCount - 1].a = answer;
+  }
+
+  const wasSkipped = answer === '[Skipped]';
+  if (!wasSkipped && followUpCount < MAX_FOLLOW_UPS) {
+    const prevQ = followUpCount === 0 ? currentMainQ.q : entry.followUps[followUpCount - 1].q;
+    await tryFollowUp(prevQ, answer);
+  } else {
+    advanceQuestion();
+  }
+}
+
+async function tryFollowUp(prevQuestion, prevAnswer) {
+  const typingEl = addBubble('typing', '');
+
+  const wordCount = prevAnswer.trim().split(/\s+/).filter(w => w).length;
+  const isShortOrVague = wordCount <= 8;
+  let followUpQ = null;
+
+  // Try AI follow-up (only available in Cowork)
+  if (typeof window.cowork !== 'undefined' && window.cowork.askClaude) {
+    try {
+      const prompt = isShortOrVague
+        ? `You are a skilled interviewer for a post-acquisition learnings interview (Everpure acquired by Pure Storage).
+
+The interviewee gave a SHORT or VAGUE answer. Push for specifics.
+
+Role: ${ROLE_LABELS[role]}
+Question: "${prevQuestion}"
+Answer: "${prevAnswer}"
+
+Generate ONE direct follow-up that pushes for more detail. Use their exact words if possible. Max 20 words. Output ONLY the question.`
+        : `You are a skilled interviewer for a post-acquisition learnings interview (Everpure acquired by Pure Storage).
+
+Role: ${ROLE_LABELS[role]}
+Question: "${prevQuestion}"
+Answer: "${prevAnswer}"
+
+Pick the most interesting unresolved thread and ask ONE specific follow-up. Be direct and conversational.
+Only output MOVE_ON if the answer is genuinely exhaustive. Max 20 words. Output ONLY the question or MOVE_ON.`;
+
+      const result = await window.cowork.askClaude(prompt, []);
+      const cleaned = (result || '').trim();
+      if (cleaned && cleaned !== 'MOVE_ON' && !cleaned.startsWith('MOVE_ON')) {
+        followUpQ = cleaned;
+      }
+    } catch(e) {}
+  }
+
+  // Fallback: use predefined follow-up bank
+  if (!followUpQ) {
+    const mainQ = transcript[transcript.length - 1].mainQ;
+    const bank = FOLLOW_UP_BANK[mainQ];
+    if (bank && followUpCount < bank.length) {
+      followUpQ = bank[followUpCount];
+    }
+  }
+
+  removeTyping();
+
+  if (followUpQ) {
+    followUpCount++;
+    const entry = transcript[transcript.length - 1];
+    entry.followUps.push({ q: followUpQ, a: null });
+    addBubble('bot', followUpQ, `Follow-up ${followUpCount}`, null);
+    waiting = false;
+    setInputDisabled(false);
+  } else {
+    advanceQuestion();
+  }
+}
+
+function finishInterview() {
+  updateProgress();
+  document.getElementById('progress-fill').style.width = '100%';
+  document.getElementById('progress-label').textContent = 'Complete';
+  show('done-screen');
+}
+
+// ─── Download ─────────────────────────────────────────────────────────────────
+
+function buildTranscript() {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+  let out = '';
+  out += '══════════════════════════════════════════════════════════\n';
+  out += '   EVERPURE · POST-ACQUISITION LEARNINGS INTERVIEW\n';
+  out += '══════════════════════════════════════════════════════════\n\n';
+  out += `Role:      ${ROLE_LABELS[role]}\n`;
+  out += `Date:      ${dateStr} at ${timeStr}\n`;
+  out += `Questions: ${transcript.length}\n\n`;
+  out += '──────────────────────────────────────────────────────────\n\n';
+
+  transcript.forEach((entry, i) => {
+    out += `Q${i + 1}. ${entry.mainQ}\n\n`;
+    const a = entry.mainA || '[No response]';
+    out += '    ' + a.split('\n').join('\n    ') + '\n\n';
+
+    if (entry.followUps && entry.followUps.length > 0) {
+      entry.followUps.forEach((fu, j) => {
+        out += `  ↳ Follow-up ${j + 1}: ${fu.q}\n\n`;
+        const fa = fu.a || '[No response]';
+        out += '    ' + fa.split('\n').join('\n    ') + '\n\n';
+      });
+    }
+
+    out += '──────────────────────────────────────────────────────────\n\n';
+  });
+
+  out += 'END OF TRANSCRIPT\n';
+  return out;
+}
+
+function submitToFormspree() {
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  document.getElementById('f-role').value = ROLE_LABELS[role];
+  document.getElementById('f-date').value = dateStr;
+  document.getElementById('f-transcript').value = buildTranscript();
+
+  const iframe = document.querySelector('iframe[name="formspree-iframe"]');
+  iframe.onload = function() {
+    btn.style.display = 'none';
+    document.getElementById('submit-msg').style.display = 'none';
+    document.getElementById('submit-success').style.display = 'block';
+  };
+
+  document.getElementById('formspree-form').submit();
+}
+
+function downloadTranscript() {
+  const out = buildTranscript();
+  const now = new Date();
+  const blob = new Blob([out], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const dateSlug = now.toISOString().slice(0, 10);
+  a.download = `Everpure_Interview_${role}_${dateSlug}.txt`;
+  a.href = url;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── Restart ──────────────────────────────────────────────────────────────────
+
+function restart() {
+  role = null;
+  mainIdx = 0;
+  followUpCount = 0;
+  transcript = [];
+  currentMainQ = null;
+  currentMainA = null;
+  waiting = false;
+  document.getElementById('chat-log').innerHTML = '';
+  document.getElementById('submit-btn').style.display = '';
+  document.getElementById('submit-btn').disabled = false;
+  document.getElementById('submit-btn').textContent = 'Submit Responses';
+  document.getElementById('submit-msg').style.display = '';
+  document.getElementById('submit-success').style.display = 'none';
+  document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('start-btn').disabled = true;
+  document.getElementById('progress-wrap').style.display = 'none';
+  document.getElementById('topbar-sub').textContent = 'Post-Acquisition Learnings · Confidential';
+  show('role-screen');
+}
+</script>
+</body>
+</html>
